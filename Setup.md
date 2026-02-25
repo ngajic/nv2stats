@@ -44,7 +44,7 @@ If you don't have vcpkg yet:
 
 ```bash
 git clone https://github.com/microsoft/vcpkg
-.\vcpkg\bootstrap-vcpkg.bat
+./vcpkg/bootstrap-vcpkg.bat
 ```
 
 ### 2. Install dependencies
@@ -52,7 +52,7 @@ git clone https://github.com/microsoft/vcpkg
 We use the `x64-windows` triplet to get shared (`.dll`) versions of the libraries:
 
 ```bash
-.\vcpkg\vcpkg install sqlite3:x64-windows zlib:x64-windows
+./vcpkg/vcpkg install sqlite3:x64-windows zlib:x64-windows
 ```
 
 ### 3. Build
@@ -71,3 +71,15 @@ The executable and the required `.dll` files will be placed together in the buil
 ## Redacted URLs
 
 Source code is missing URLs necessary for tool to work. They are REDACTED as to not be easily available on the web. You can obtain info on this URLs by contacting community on Discord server dedicated for this awesome platformer franchise.
+
+## Highscore database
+
+This tool works with a highscore database, called `highscores.db`, that needs to exist beforehand.
+
+When starting anew you can create it yourself:
+
+```bash
+./nv2stats -c
+```
+
+or if you have obtained older one before, then you are all set!
