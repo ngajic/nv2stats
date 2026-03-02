@@ -3,7 +3,6 @@
 
 static const char *create = { "CREATE TABLE %s(day DATE, level INT(3) NOT NULL, nick VARCHAR(255) NOT NULL, place INT(1) NOT NULL, score INT(10) NOT NULL, flag_tied INT(1) NOT NULL, PRIMARY KEY(day, level, place)) WITHOUT ROWID;" };
 static const char *insert = { "INSERT INTO %s VALUES('%04d-%02d-%02d','%d','%s','%d','%d'%s);" };
-static const char *select = { "SELECT * FROM %s WHERE nick = '%-14s' AND place = %d ORDER BY score DESC;" };
 static const char *drop = { "DROP TABLE IF EXISTS %s;" };
 static const char *countX = { "SELECT count(*) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000) AS sub WHERE sub.nick='%s' AND sub.place=%d;" };
 static const char *check_score = { "SELECT count(*) FROM %s WHERE level=%d AND place=%d AND nick='%s' AND score=%d;" };

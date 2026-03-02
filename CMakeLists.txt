@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.17)
 project(nv2stats C)
 
 set(CMAKE_C_STANDARD 17)
-set(CMAKE_BUILD_TYPE Debug)
 
 set(BUILD_SHARED_LIBS ON)
 
@@ -24,10 +23,37 @@ add_executable(nv2ninjaremoval
     main_ninjaremoval.c
 )
 
+if(MSVC)
+    target_compile_options(nv2ninjaremoval PRIVATE
+        /O2
+        /Oi
+        /GL
+        /Gy
+    )
+    target_link_options(nv2ninjaremoval PRIVATE
+        /LTCG
+    )
+else()
+    target_compile_options(nv2ninjaremoval PRIVATE
+        -O3
+        -march=native
+        -flto
+        -funroll-loops
+        -fomit-frame-pointer
+    )
+    target_link_options(nv2ninjaremoval PRIVATE
+        -flto
+    )
+endif()
+
 target_link_libraries(nv2stats PRIVATE
     SQLite::SQLite3
     ZLIB::ZLIB
 )
+
+if(UNIX)
+    target_link_libraries(nv2stats PRIVATE m)
+endif()
 
 if(WIN32)
     target_compile_definitions(nv2stats PRIVATE _CRT_SECURE_NO_WARNINGS=1)

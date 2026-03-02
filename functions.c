@@ -1667,7 +1667,7 @@ int update_charts(int argc, char **argv, struct tm *t)
         goto cleanup;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, count_distinc_days);
+    snprintf(sql_cmd, sizeof sql_cmd, "%s", count_distinc_days);
     sqlite3_exec(db, sql_cmd, callback_count, &distinct_days, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2163,7 +2163,7 @@ int set_tied_scores(int argc, char **argv, struct tm *t)
         return -10;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, count_distinc_days);
+    snprintf(sql_cmd, sizeof sql_cmd, "%s", count_distinc_days);
     sqlite3_exec(db, sql_cmd, callback_count, &distinct_days, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
