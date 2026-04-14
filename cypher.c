@@ -1,6 +1,8 @@
 #include "cypher.h"
 
-static unsigned char cypher_table[] = {
+#include <assert.h>
+
+static char cypher_table[] = {
             ['='] = '?',
             ['A'] = '!',
             ['C'] = '"',
@@ -57,11 +59,14 @@ static unsigned char cypher_table[] = {
             ['~'] = 'y'
 };
 
-void cypher(unsigned char *s)
+void cypher(char *s)
 {
     for ( ; *s; ++s)
-        if (cypher_table[*s])
-            *s = cypher_table[*s];
+    {
+        assert(*s >= 0 && *s < 127);
+        if (cypher_table[(unsigned char)*s])
+            *s = cypher_table[(unsigned char)*s];
+    }
 
     return;
 }

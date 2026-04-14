@@ -3,6 +3,10 @@ project(nv2stats C)
 
 set(CMAKE_C_STANDARD 17)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 set(BUILD_SHARED_LIBS ON)
 
 find_package(SQLite3 REQUIRED)
@@ -14,7 +18,6 @@ add_executable(nv2stats
     cypher.h cypher.c
     functions.h functions.c
     opt.h opt.c
-    sqlcmds.h
     util.h util.c
     usage.h
 )
@@ -35,6 +38,15 @@ if(MSVC)
     )
 else()
     target_compile_options(nv2ninjaremoval PRIVATE
+        -Wall -Wextra -Wpedantic
+        -Wshadow -Wdouble-promotion -Wconversion -Wsign-conversion
+        -Wnull-dereference -Wstrict-prototypes -Wmissing-prototypes
+        -Wno-unused-function -Wno-missing-braces
+
+        -fanalyzer
+
+        -fstack-protector-strong
+
         -O3
         -march=native
         -flto
@@ -44,6 +56,25 @@ else()
     target_link_options(nv2ninjaremoval PRIVATE
         -flto
     )
+
+    target_compile_options(nv2stats PRIVATE
+        -Wall -Wextra -Wpedantic
+        -Wshadow -Wdouble-promotion -Wconversion -Wsign-conversion
+        -Wnull-dereference -Wstrict-prototypes -Wmissing-prototypes
+        -Wno-unused-function -Wno-missing-braces
+
+        -fanalyzer
+
+        -fstack-protector-strong
+
+        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+    )
+
+    target_link_options(nv2stats PRIVATE
+        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+    )
+
+
 endif()
 
 target_link_libraries(nv2stats PRIVATE

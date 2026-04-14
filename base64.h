@@ -6,8 +6,8 @@
 	This way I don't check for invalid pointers passed to these functions. It is your simple duty! */
 #define OUTPUT_LEN_IGNORED	&(size_t){0}
 
-void base64_encode(const unsigned char *in, size_t len, unsigned char *out, size_t *out_len);
-void base64_decode(const unsigned char *in, size_t len, unsigned char *out, size_t *out_len);
-void base64_decode_to_hex(const unsigned char *in, size_t len, unsigned char *out);
+void base64_encode(const unsigned char *in, size_t len, char *out, size_t *out_len);
+void base64_decode(const char *in, size_t len, unsigned char *out, size_t *out_len);
+void base64_decode_to_hex(const char *in, size_t len, char *out);
 
 #endif // OXY_BASE64_H_

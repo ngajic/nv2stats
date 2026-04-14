@@ -94,7 +94,11 @@ static void get_filled_levels_usage(void)
 
 static void generate_heatmap_usage(void)
 {
-    puts(__func__);
+    puts("Usage: nv2stats.exe --heat <player>");
+    puts("-----------------------------------");
+    puts("<player>        - Player interested in generating heatmap for.");
+    puts("Description: Shows metanet levels placement distribution for a player on a map, with heat colors indicating better or worse placements.\n");
+
 }
 
 static void usage_usage(void)

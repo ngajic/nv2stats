@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
@@ -5,19 +6,24 @@
 #include <ctype.h>
 #include "util.h"
 
-int str_to_lvl(const char *str)
+unsigned str_to_lvl(const char *str)
 {
-    int lvl = -1;
+    assert(str);
+    unsigned lvl = (unsigned)-1;
     char *p = NULL;
 
     if (isalpha(*str)) {
-        lvl = 5 * ((*str == 'a' ? 100 : 110) + str[1] - '0');
+        assert(isdigit(str[1]));
+        lvl = 5 * (unsigned)(((*str == 'a' ? 100 : 110) + str[1] - '0'));
     }
-    else lvl = 5 * strtol(str, NULL, 10);
+    else lvl = 5 * (unsigned)strtoul(str, NULL, 10);
 
     p = strchr(str, '-');
     if (p)
-        lvl += p[1] - '0';
+    {
+        assert(isdigit(p[1]) && p[1] < '5');
+        lvl += (unsigned)(p[1] - '0');
+    }
 
     return lvl;
 }

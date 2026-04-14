@@ -1,8 +1,9 @@
+#include <assert.h>
 #include <stdio.h>
 
 #include "base64.h"
 static const char *hex_map = "0123456789ABCDEF";
-static const unsigned char b64char[] = { "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" };
+static const char b64char[] = { "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" };
 static const unsigned char b64decode[] = {
                                     ['A'] = 0,
                                     ['B'] = 1,
@@ -69,9 +70,10 @@ static const unsigned char b64decode[] = {
                                     ['+'] = 62,
                                     ['/'] = 63 };
 
-void base64_encode(const unsigned char *in, size_t len, unsigned char *out, size_t *out_len)
+void base64_encode(const unsigned char *in, size_t len, char *out, size_t *out_len)
 {
-    const unsigned char *start = in, *end = in + len, *out_begin = out;
+    const unsigned char *start = in, *end = in + len;
+    const char *out_begin = out;
 
     while (end - start >= 3) {
         *out++ = b64char[start[0] >> 2];
@@ -92,39 +94,43 @@ void base64_encode(const unsigned char *in, size_t len, unsigned char *out, size
         }
         *out++ = '=';
     }
-	*out_len = out - out_begin;
+
+    assert(out >= out_begin);
+	*out_len = (size_t)(out - out_begin);
     *out = 0;
 }
 
-void base64_decode(const unsigned char *in, size_t len, unsigned char *out, size_t *out_len)
+void base64_decode(const char *in, size_t len, unsigned char *out, size_t *out_len)
 {
-    const unsigned char *start = in, *end = in + len, *out_begin = out;
+    const char *start = in, *end = in + len;
+    const unsigned char *out_begin = out;
 
     if (len % 4)
         return;
 
-	while (end - start > 4) {
-		*out++ = (b64decode[start[0]] << 2) | (b64decode[start[1]] >> 4);
-		*out++ = (b64decode[start[1]] << 4) | (b64decode[start[2]] >> 2);
-		*out++ = (b64decode[start[2]] << 6) | b64decode[start[3]];
+    while (end - start > 4) {
+		*out++ = (b64decode[(unsigned char)start[0]] << 2) | (b64decode[(unsigned char)start[1]] >> 4);
+		*out++ = (b64decode[(unsigned char)start[1]] << 4) | (b64decode[(unsigned char)start[2]] >> 2);
+		*out++ = (b64decode[(unsigned char)start[2]] << 6) | b64decode[(unsigned char)start[3]];
 		start += 4;
 	}
 
 	// last block
-	*out++ = (b64decode[start[0]] << 2) | (b64decode[start[1]] >> 4);
+	*out++ = (b64decode[(unsigned char)start[0]] << 2) | (b64decode[(unsigned char)start[1]] >> 4);
 	if (start[2] != '=') {
-		*out++ = (b64decode[start[1]] << 4) | (b64decode[start[2]] >> 2);
+		*out++ = (b64decode[(unsigned char)start[1]] << 4) | (b64decode[(unsigned char)start[2]] >> 2);
 		if (start[3] != '=')
-			*out++ = (b64decode[start[2]] << 6) | b64decode[start[3]];
+			*out++ = (b64decode[(unsigned char)start[2]] << 6) | b64decode[(unsigned char)start[3]];
 	}
 
-	*out_len = out - out_begin;
+    assert(out >= out_begin);
+	*out_len = (size_t)(out - out_begin);
     *out = 0;
 }
 
-void base64_decode_to_hex(const unsigned char *in, size_t len, unsigned char *out)
+void base64_decode_to_hex(const char *in, size_t len, char *out)
 {
-	const unsigned char *start = in, *end = in + len;
+	const char *start = in, *end = in + len;
 	unsigned char b;
 
 	if (len % 4)
@@ -133,9 +139,9 @@ void base64_decode_to_hex(const unsigned char *in, size_t len, unsigned char *ou
 	for ( ; end - start > 4; start += 4) {
 		unsigned char b1, b2, b3;
 
-		b1 = (b64decode[start[0]] << 2) | (b64decode[start[1]] >> 4);
-		b2 = (b64decode[start[1]] << 4) | (b64decode[start[2]] >> 2);
-		b3 = (b64decode[start[2]] << 6) | b64decode[start[3]];
+		b1 = (b64decode[(unsigned char)start[0]] << 2) | (b64decode[(unsigned char)start[1]] >> 4);
+		b2 = (b64decode[(unsigned char)start[1]] << 4) | (b64decode[(unsigned char)start[2]] >> 2);
+		b3 = (b64decode[(unsigned char)start[2]] << 6) | b64decode[(unsigned char)start[3]];
 
 		*out++ = hex_map[b1 >> 4];
 		*out++ = hex_map[b1 & 0xF];
@@ -145,15 +151,15 @@ void base64_decode_to_hex(const unsigned char *in, size_t len, unsigned char *ou
 		*out++ = hex_map[b3 & 0xF];
 	}
 
-	b = (b64decode[start[0]] << 2) | (b64decode[start[1]] >> 4);
+	b = (b64decode[(unsigned char)start[0]] << 2) | (b64decode[(unsigned char)start[1]] >> 4);
 	*out++ = hex_map[b >> 4];
 	*out++ = hex_map[b & 0xF];
 	if (start[2] != '=') {
-		b = (b64decode[start[1]] << 4) | (b64decode[start[2]] >> 2);
+		b = (b64decode[(unsigned char)start[1]] << 4) | (b64decode[(unsigned char)start[2]] >> 2);
 		*out++ = hex_map[b >> 4];
 		*out++ = hex_map[b & 0xF];
 		if (start[3] != '=') {
-            b = (b64decode[start[2]] << 6) | b64decode[start[3]];
+            b = (b64decode[(unsigned char)start[2]] << 6) | b64decode[(unsigned char)start[3]];
             *out++ = hex_map[b >> 4];
             *out++ = hex_map[b & 0xF];
         }

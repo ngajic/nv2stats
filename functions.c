@@ -1,6 +1,7 @@
 /* ============================================================================================== */
 /*                                   Include C Library Files                                      */
 /* ============================================================================================== */
+#include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdbool.h>
@@ -20,10 +21,8 @@
 #include "zlib.h"
 
 /* ============================================================================================== */
-/*                                     Include Private Files                                      */
+/*                                             Private                                            */
 /* ============================================================================================== */
-#include "sqlcmds.h"
-
 
 #define NUM_LEVELS  600         // Number of metanet levels
 #define NUM_ENTRIES 10          // Number of spots on leaderboard
@@ -31,6 +30,11 @@
 
 #define TYPE_INT        1       // Used for functions which work with generic datatypes
 #define TYPE_FLOAT      2       // Used for functions which work with generic datatypes
+
+#define SQLITE_INT_RANGE_CHECK(val) do {if ((val) > INT_MAX || (val) < INT_MIN) return SQLITE_RANGE;} while(0)
+#define SQLITE_USHRT_INT_RANGE_CHECK(val) do {if ((val) > USHRT_MAX || (val) < 0) return SQLITE_RANGE;} while(0)
+
+#define IGNORE_RESULT(x) do { int _r = (x); (void)_r; } while(0)
 
 //! General placeholder for callback functions which keeps information about player on a given level
 struct storage {
@@ -55,6 +59,7 @@ struct sql_callback_data {
     size_t stats_cnt;
     struct stats *stats;
 };
+
 //! Date structure
 struct date {
     int yy;         // year
@@ -65,15 +70,6 @@ struct date {
 //! Hard template for footer of index page
 static const char *index_footer = { "\t</ul>\n\t</marquee>\n\t</aside>\n\n\t</main>\n\n\t<footer>\n\t\t<p>Have spare time? Use your CSS and HTML skills at this "
                         "<a href=\"https://github.com/ngajic/ngajic.github.io\">repository</a> where this site is hosted.</p>\n\t</footer>\n\t</body>\n</html>\n" };
-
-//! Hard template for header
-static const char *level_header_part1 = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<head>\n\t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n\t\t"
-                       "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\t\t<title>" };
-
-//! Hard template for other part of the header
-static const char *level_header_part2 = { "</title>\n\n\n\t\t<link rel=\"stylesheet\" type=\"text/css\" href=\"../css/styles.css\">\n\t</head>\n\t<body>\n\t"
-                       "<script src=\"../code/highcharts.js\"></script>\n\t<script src=\"../code/themes/grid.js\"></script>\n\t<!--script src=\"../code/modules/series-label.js\"></script-->\n\t"
-                       "<script src=\"../code/modules/exporting.js\"></script>\n\t<script src=\"../code/modules/export-data.js\"></script>\n\n" };
 
 //! Hard template for level history page, includes Javascript scripts for example
 static const char *header = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<head>\n\t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n\t\t"
@@ -92,8 +88,8 @@ static const char *header = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<head>\
                        "</ul>\n\t\t</nav>\n\n\t\t<form action=\"\" onsubmit=\"return false;\">\n" };
 
 //! Template for each level div container in level history page
-static const char *highchart = { "\t<div id=\"container%d\" style=\"display: %s; min-width: 310px; height: 600px; margin: 0 auto\">"
-                                 "</div>\n\n\t\t<script type=\"text/javascript\">\n\nHighcharts.chart('container%d', {\n\tchart: {\n\t\ttype: 'spline',\n\t\tzoomType: 'xy'\n\t},\n\ttitle: {\n\t\ttext: '%d-%d Level Owner history'\n\t"
+static const char *highchart = { "\t<div id=\"container%u\" style=\"display: %s; min-width: 310px; height: 600px; margin: 0 auto\">"
+                                 "</div>\n\n\t\t<script type=\"text/javascript\">\n\nHighcharts.chart('container%u', {\n\tchart: {\n\t\ttype: 'spline',\n\t\tzoomType: 'xy'\n\t},\n\ttitle: {\n\t\ttext: '%u-%u Level Owner history'\n\t"
                                  "},\n\tsubtitle: {\n\t\ttext: 'Irregular time data in Highcharts JS'\n\t},\n\txAxis: {\n\t\ttype: 'datetime',\n\t\ttitle: {\n\t\t\ttext: 'Date'\n"
                                  "\t\t}\n\t},\n\tyAxis: {\n\t\ttitle: {\n\t\t\ttext: 'Score'\n\t\t},\n\t\tmin: %d\n\t},\n\ttooltip: {\n\t\theaderFormat: '<b>{series.name}</b><br>',\n"
                                  "\t\tpointFormat: '{point.x:%%e. %%b}: {point.y:%%f} frames'\n\t},\n\tplotOptions: {\n\t\tspline: {\n\t\t\tmarker: {\n\t\t\t\tenabled: true\n\t\t\t"
@@ -106,15 +102,6 @@ static const char *curr_header = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<h
                             "</script>\n\t<script src=\"../code/highcharts-more.js\"></script>\n\t<script src=\"../code/modules/item-series.js\"></script>\n\n\n\t"
                             "<header id=\"header-timeline\">\n\t\t<h1>Welcome to</h1>\n\t\t<h1>Nv2 latest charts</h1>\n\n\t\t<nav>\n\t\t<ul>\n\t\t\t<li><a href=\"../index.htm\">"
                             "Home</a></li\n\t\t\t><li><a href=\"../about.htm\">About</a></li>\n\t\t</ul>\n\t\t</nav>\n\t</header>\n\n" };
-
-//! Template for timeline charts
-static const char *highchart2 = { "\t<div id=\"container\" style=\"min-width: 310px; height: 600px; margin: 0 auto\">"
-                          "</div>\n\n\t\t<script type=\"text/javascript\">\n\nHighcharts.chart('container', {\n\tchart: {\n\t\ttype: 'spline',\n\t\tzoomType: 'xy'\n\t},\n\ttitle: {\n\t\ttext: '%s'\n\t"
-                          "},\n\tsubtitle: {\n\t\ttext: 'Irregular time data in Highcharts JS'\n\t},\n\txAxis: {\n\t\ttype: 'datetime',\n\t\ttitle: {\n\t\t\ttext: 'Date'\n"
-                          "\t\t}\n\t},\n\tyAxis: {\n\t\ttitle: {\n\t\t\ttext: 'Score'\n\t\t},\n\t\tmin: 0%s\n\t},\n\ttooltip: {\n\t\theaderFormat: '<b>{series.name}</b><br>',\n"
-                          "\t\tpointFormat: '{point.x:%%e. %%b}: {point.y:%%f} %s'\n\t},\n\tplotOptions: {\n\t\tspline: {\n\t\t\tmarker: {\n\t\t\t\tenabled: true\n\t\t\t"
-                          "}\n\t\t},\n\t\tseries: {\n\t\t\tpoint: {\n\t\t\t\tevents: {\n\t\t\t\t\tclick: function() {\n\t\t\t\t\t\twindow.location.href = this.series.options.website;"
-                          "\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t\tcursor: 'pointer'\n\t\t}\n\t},\n\n\tseries: [{\n" };
 
 //! Hard template for heatmap pages header and starting body
 static const char *player_heatmap = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<head>\n\t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n\t\t"
@@ -154,7 +141,6 @@ static const char *histogram_chart = { "Highcharts.chart('container2', {\n\tchar
                                 "pointFormat: '{series.name}: {point.y}<br/>'\n\t},\n\tplotOptions: {\n\t\tcolumn: {\n\t\t\tpointPadding: 0,\n\t\t\tborderWidth: 0,\n\t\t\tgroupPadding: 0,\n\t\t\tstacking: 'normal',\n\t\t\tdataLabels: {\n\t\t\t\t"
                                 "enabled: false\n\t\t\t}\n\t\t}\n\t},\n\tseries: [{\n\t\tname: 'Number of positions',\n\t\tdata: [" };
 
-
 //! Timeline charts file names
 const char *chart_files[] = {"0thRankingsChart.htm", "0thRankingsNoTiesChart.htm", "Top10RankingsChart.htm", "Top5RankingsChart.htm", "PointsRankingsChart.htm", "AverageRankingsChart.htm"};
 //! Name placeholder used in callback functions called by sqlite
@@ -165,6 +151,10 @@ const char *date_placeholder = { "\t\t\t[Date.UTC(%4d,%2d,%2d),%5d]" };
 const char *date_placeholder_float = { "\t\t\t[Date.UTC(%4d,%2d,%2d),%.6f]" };
 //! Date placeholder + nil data used in callback functions called by sqlite
 const char *date_placeholder_null = { "\t\t\t[Date.UTC(%4d,%2d,%2d), null]" };
+
+//! Buffer used for forming SQL commands
+#define SQL_CMD_BUF_LEN 512
+static char sql_cmd[SQL_CMD_BUF_LEN];
 
 //! Buffer used for forming big strings used for generating charts
 char form_buffer[1000];
@@ -180,9 +170,6 @@ static const char *players[] = {"EddyMataGallos", "kkstrong", "VotedStraw", "Spa
                          "swipenet", "shilo1122", "Thisguy248", };
 #define NUM_PLAYERS     (sizeof players/ sizeof *players)      // Number of players for which timeline charts are generated
 
-//! Months 3-letter abbriviations
-static const char *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-
 //! Some colors in HEX format for some CSS stylings
 static const char *colors[] = { "#BE3075",  "#EB001F",  "#64A12D",  "#000000",  "#00DDEE",  "#008AC5",  "#a83232",  "#005555",  "#FFED00",  "#FFEDAA",
                          "#ABCDEF",  "#bb00bb",  "#888888",  "#325ea8",  "#9a32a8",  "#00aa00",  "#a83277",  "#32a85f",  "#009EE0",  "#83a832",
@@ -193,22 +180,22 @@ static const char *begin_transaction = { "BEGIN TRANSACTION" };
 static const char *end_transaction = { "END TRANSACTION" };
 
 //! Command for downloading level leaderboard
-static const char *download_scores_template = { "wget -q -N http://REDACTED/%1d/%02d/%03d.txt 2>nul" };
+static const char *download_scores_template = { "wget -q -N http://REDACTED/%1u/%02u/%03u.txt 2>nul" };
 
 //! Command for downloading demo data
 static const char *download_demos_template = { "wget -q http://REDACTED/%s 2>nul" };
 
 //! Scores by level and position
-int loadScores[NUM_LEVELS][NUM_ENTRIES];
+unsigned loadScores[NUM_LEVELS][NUM_ENTRIES];
 
 //! Player nicks by level and position
 char loadNames[NUM_LEVELS][NUM_ENTRIES][MAX_NAME_LEN + 1];
 
 //! ID's by level and position
-int loadIDs[NUM_LEVELS][NUM_ENTRIES];
+unsigned loadIDs[NUM_LEVELS][NUM_ENTRIES];
 
 //! Old scores by level and position
-int oldScores[NUM_LEVELS][NUM_ENTRIES];
+unsigned oldScores[NUM_LEVELS][NUM_ENTRIES];
 
 //! Old player nicks by level and position
 char oldNames[NUM_LEVELS][NUM_ENTRIES][MAX_NAME_LEN + 1];
@@ -246,7 +233,7 @@ static void getYesterdayDate(struct date *d){
 			d->mm--;
 		}
 		else if(d->mm==3){
-			if((d->yy % 400 == 0) || ((d->yy%4)==0) && (d->yy % 100 != 0)) d->dd=29;
+			if((d->yy % 400 == 0) || ((d->yy%4 == 0) && (d->yy % 100 != 0))) d->dd=29;
 			else d->dd=28;
 			d->mm--;
 		}
@@ -303,7 +290,7 @@ static void getTomorrowDate(struct date* d) {
         }
     }
     else if (d->dd == 28) {
-        if (d->mm == 2 && (!((d->yy % 400 == 0) || ((d->yy % 4) == 0) && (d->yy % 100 != 0)))) {
+        if (d->mm == 2 && (!((d->yy % 400 == 0) || ((d->yy % 4 == 0) && (d->yy % 100 != 0))))) {
             d->dd = 1;
             d->mm = 3;
         }
@@ -339,7 +326,11 @@ static int callback_count(void *storage, int argc, char **row, char **columns)
 {
     (void)argc;
     (void)columns;
-    *(int *)storage = strtol(*row, NULL, 10);
+    long count = strtol(*row, NULL, 10);;
+
+    SQLITE_INT_RANGE_CHECK(count);
+
+    *(int *)storage = (int) count;
 
     return SQLITE_OK;
 }
@@ -365,9 +356,16 @@ static int gen_history_callback(void *storage, int argc, char **row, char **colu
 
     struct storage *p = storage;
 
-    strncpy(p[gen_history_cb_cnt].day, row[0], 11);
+    long score = strtol(row[2], NULL, 10);
+
+    SQLITE_INT_RANGE_CHECK(score);
+
+    assert(strlen(row[0]) < 11);
+    strncpy(p[gen_history_cb_cnt].day, row[0], 10);
+    p[gen_history_cb_cnt].day[10] = 0;
     strncpy(p[gen_history_cb_cnt].nick, row[1], MAX_NAME_LEN);
-    p[gen_history_cb_cnt++].score = strtol(row[2], NULL, 10);
+    p[gen_history_cb_cnt].nick[MAX_NAME_LEN] = 0;
+    p[gen_history_cb_cnt++].score = (int)score;
 
     return SQLITE_OK;
 }
@@ -388,30 +386,37 @@ static int callback_oneline(void *storage, int argc, char **row, char **columns)
 {
     (void)argc;
     (void)columns;
-    int  year, month, day;
+    long  year, month, day;
     struct tm* t = (struct tm*)storage;
 
     year = strtol(row[0], NULL, 10);
     month = strtol(&row[0][5], NULL, 10) - 1;
     day = strtol(&row[0][8], NULL, 10);
 
+    SQLITE_INT_RANGE_CHECK(year);
+    SQLITE_INT_RANGE_CHECK(month);
+    SQLITE_INT_RANGE_CHECK(day);
+
     if (t->tm_wday == TYPE_INT) {
-        int count = strtol(row[1], NULL, 10);
+        long count = strtol(row[1], NULL, 10);
+
+        SQLITE_INT_RANGE_CHECK(count);
+
         if (count) {
-            fprintf(fw, date_placeholder, year, month, day, count);
+            fprintf(fw, date_placeholder, (int)year, (int)month, (int)day, (int)count);
             flag_null = 0;
         }
         else {
             if (flag_null)
-                fprintf(fw, date_placeholder_null, year, month, day);
+                fprintf(fw, date_placeholder_null, (int)year, (int)month, (int)day);
             else
-                fprintf(fw, date_placeholder,  year, month, day, 0);
+                fprintf(fw, date_placeholder,  (int)year, (int)month, (int)day, 0);
             flag_null = 1;
         }
     }
     else {
         double count = strtod(row[1], NULL);
-        fprintf(fw, date_placeholder_float, year, month, day, count);
+        fprintf(fw, date_placeholder_float, (int)year, (int)month, (int)day, count);
         flag_null = 0;
     }
     if (row_cnt++ == distinct_days || ((1900 + t->tm_year == year) && (t->tm_mon == month) && (t->tm_mday == day)))
@@ -465,16 +470,16 @@ static int distinc_scores_callback(void *storage, int argc, char **row, char **c
     (void)columns;
     struct date yesterday, today;
 
-    today.yy = strtol(row[0], NULL, 10);
-    today.mm = strtol(&row[0][5], NULL, 10);
-    today.dd = strtol(&row[0][8], NULL, 10);
+    today.yy = (int)strtol(row[0], NULL, 10);
+    today.mm = (int)strtol(&row[0][5], NULL, 10);
+    today.dd = (int)strtol(&row[0][8], NULL, 10);
     if (row_cnt++) {
         yesterday = today;
         getYesterdayDate(&yesterday);
         printf(date_placeholder, yesterday.yy, yesterday.mm - 1, yesterday.dd, prev_score);
         printf(",\n");
     }
-    prev_score = strtol(row[1], NULL, 10);
+    prev_score = (int)strtol(row[1], NULL, 10);
     printf(date_placeholder, today.yy, today.mm - 1, today.dd, prev_score);
     printf(",\n");
 
@@ -500,11 +505,10 @@ static int activity_callback(void* storage, int argc, char** row, char** columns
     (void)columns;
     struct date yesterday, now;
     static struct date prev;
-    int count;
 
-    now.yy = strtol(row[0], NULL, 10);
-    now.mm = strtol(&row[0][5], NULL, 10);
-    now.dd = strtol(&row[0][8], NULL, 10);
+    now.yy = (int)strtol(row[0], NULL, 10);
+    now.mm = (int)strtol(&row[0][5], NULL, 10);
+    now.dd = (int)strtol(&row[0][8], NULL, 10);
     
     if (row_cnt++) {
         yesterday = now;
@@ -521,8 +525,9 @@ static int activity_callback(void* storage, int argc, char** row, char** columns
         }
     }
 
-    count = strtol(row[1], NULL, 10);
-    printf(date_placeholder, now.yy, now.mm - 1, now.dd, count);
+    long count = strtol(row[1], NULL, 10);
+    SQLITE_INT_RANGE_CHECK(count);
+    printf(date_placeholder, now.yy, now.mm - 1, now.dd, (int)count);
     printf(",\n");
     prev = now;
 
@@ -593,7 +598,11 @@ static int callback_histogram(void *storage, int argc, char **row, char **column
     (void)argc;
     (void)columns;
 
-    histogram[row[0][0] - '0'] = strtol(row[1], NULL, 10);
+    long hist_val = strtol(row[1], NULL, 10);
+
+    SQLITE_USHRT_INT_RANGE_CHECK(hist_val);
+
+    histogram[row[0][0] - '0'] = (unsigned short)hist_val;
     if (histogram[row[0][0] - '0'] > generic_int_placeholder)
         generic_int_placeholder = histogram[row[0][0] - '0'];
 
@@ -619,8 +628,8 @@ static int callback_fill_leaderboard(void *storage, int argc, char **row, char *
     (void)columns;
 
     char (*names)[NUM_ENTRIES][MAX_NAME_LEN + 1] = storage;
-    int level = strtol(row[1], NULL, 10);
-    int place = strtol(row[2], NULL, 10);
+    int level = (int)strtol(row[1], NULL, 10);
+    int place = (int)strtol(row[2], NULL, 10);
 
     strncpy(names[level][place], row[0], MAX_NAME_LEN + 1);
 
@@ -646,9 +655,13 @@ static int callback_heatmap(void *storage, int argc, char **row, char **columns)
     (void)columns;
 
     static int lvl = 0;
-    int curr_level = strtol(row[0], NULL, 10);
-    int place = strtol(row[1], NULL, 10);
+    int curr_level = (int)strtol(row[0], NULL, 10);
+    int place = (int)strtol(row[1], NULL, 10);
 
+    // generic in placeholder represents number of placements player has on metanet level boards, it is strictly non-negative.
+    assert(generic_int_placeholder >= 0);
+    const unsigned int num_of_placements = (unsigned) generic_int_placeholder;
+    
     while (lvl < 600) {
         if (lvl != curr_level) {
             fprintf(fw, "[%d, %d, 10]", lvl/ 5, lvl% 5);
@@ -665,7 +678,7 @@ static int callback_heatmap(void *storage, int argc, char **row, char **columns)
             if (lvl%13 == 12)
                 fprintf(fw, "\n\t\t\t");
             ++lvl;
-            if (++row_cnt != generic_int_placeholder)
+            if (++row_cnt != num_of_placements)
                 break;
         }
     }
@@ -685,7 +698,7 @@ static int callback_heatmap(void *storage, int argc, char **row, char **columns)
  *
  *  \return [out] SQLITE_OK
  */
-int callback_stats(void* storage, int argc, char** row, char** column)
+static int callback_stats(void* storage, int argc, char** row, char** column)
 {
     (void)column;
 
@@ -860,7 +873,9 @@ static int cmp_str(const void *v1, const void *v2)
 }
 #endif // 1
 
-/* Interface */
+/* ============================================================================================== */
+/*                                            Interface                                           */
+/* ============================================================================================== */
 
 int create_table(int argc, char **argv, struct tm *t)
 {
@@ -879,14 +894,17 @@ int create_table(int argc, char **argv, struct tm *t)
       sqlite3_close(db);
       return -1;
     }
-    snprintf(sql_cmd, sizeof sql_cmd, drop, name);
+
+    snprintf(sql_cmd, sizeof sql_cmd, "DROP TABLE IF EXISTS %s;", name);
     rc = sqlite3_exec(db, sql_cmd, NULL, 0, &zErrMsg);
     if( rc!=SQLITE_OK ){
       fprintf(stderr, "SQL error: %s\n", zErrMsg);
       sqlite3_free(zErrMsg);
       return -2;
     }
-    snprintf(sql_cmd, sizeof sql_cmd, create, name);
+
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "CREATE TABLE %s(day DATE, level INT(3) NOT NULL, nick VARCHAR(255) NOT NULL, place INT(1) NOT NULL, score INT(10) NOT NULL, flag_tied INT(1) NOT NULL, PRIMARY KEY(day, level, place)) WITHOUT ROWID;", name);
     rc = sqlite3_exec(db, sql_cmd, NULL, 0, &zErrMsg);
     if( rc!=SQLITE_OK ){
       fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -898,10 +916,8 @@ int create_table(int argc, char **argv, struct tm *t)
     return SQLITE_OK;
 }
 
-
 int insert_into(int argc, char **argv, struct tm *t)
 {
-    (void)argc;
     (void)t;
 
     sqlite3 *db;                            // sqlite3 database handler
@@ -965,7 +981,7 @@ int insert_into(int argc, char **argv, struct tm *t)
     else if (flag == FLAG_HS) {
 #endif
         // reorder hs files by chronological order
-        qsort(argv, argc, sizeof *argv, cmp_str);
+        qsort(argv, (size_t)argc, sizeof *argv, cmp_str);
 
         // read each hs and insert it
         for ( ; *argv; ++argv) {
@@ -983,23 +999,25 @@ int insert_into(int argc, char **argv, struct tm *t)
             if (fgets(buf, sizeof buf, fr) == NULL) {
                 fprintf(stderr, "Error in reading file %s!\n", *argv);
                 sqlite3_close(db);
+                fclose(fr);
                 return -4;
             }
             if (strcmp(buf, "#*N2High-v3.0*#\n")) {
                 fprintf(stderr, "Header suggests this is not highscore file! %s\n", *argv);
                 sqlite3_close(db);
+                fclose(fr);
                 return -5;
             }
 
-            day = strtoul(&argv[0][6], NULL, 10);
+            day = (int)strtoul(&argv[0][6], NULL, 10);
             argv[0][6] = 0;
-            month = strtoul(&argv[0][4], NULL, 10);
+            month = (int)strtoul(&argv[0][4], NULL, 10);
             argv[0][4] = 0;
-            year = strtoul(argv[0], NULL, 10);
+            year = (int)strtoul(argv[0], NULL, 10);
 
             for (int i = 0; i < NUM_LEVELS; ++i) {
                 for (int j = 0; j < NUM_ENTRIES; ++j) {
-                    int len;
+                    size_t len;
                     char input[33];
                     char output[33];
 
@@ -1009,7 +1027,7 @@ int insert_into(int argc, char **argv, struct tm *t)
                         input[len++] = (char)c;
                     input[len] = 0;
                     cypher(input);
-                    base64_decode(input, len, output, OUTPUT_LEN_IGNORED);
+                    base64_decode(input, len, (unsigned char *)output, OUTPUT_LEN_IGNORED);
                     strcpy(loadNames[i][j], output);
 
                     // reading score
@@ -1018,8 +1036,8 @@ int insert_into(int argc, char **argv, struct tm *t)
                         input[len++] = (char)c;
                     input[len] = 0;
                     cypher(input);
-                    base64_decode(input, len, output, OUTPUT_LEN_IGNORED);
-                    loadScores[i][j] = strtoul(output, NULL, 10);
+                    base64_decode(input, len, (unsigned char *)output, OUTPUT_LEN_IGNORED);
+                    loadScores[i][j] = (unsigned)strtoul(output, NULL, 10);
 
                     // This one is ignored (the ID of the player)
                     len = 0;
@@ -1027,15 +1045,17 @@ int insert_into(int argc, char **argv, struct tm *t)
                         input[len++] = (char)c;
                     input[len] = 0;
                     cypher(input);
-                    base64_decode(input, len, output, OUTPUT_LEN_IGNORED);
-                    loadIDs[i][j] = strtoul(output, NULL, 10);
+                    base64_decode(input, len, (unsigned char *)output, OUTPUT_LEN_IGNORED);
+                    loadIDs[i][j] = (unsigned)strtoul(output, NULL, 10);
+
+#define SQL_INSERT_CMD "INSERT INTO %s VALUES('%04d-%02d-%02d','%d','%s','%d','%u'%s);"
 
                     int count = 0;
                     if (j != 0 && loadScores[i][0] == loadScores[i][j])
-                        snprintf(sql_cmd, sizeof sql_cmd, insert, "scores", year, month, day, i, loadNames[i][j], j,
+                        snprintf(sql_cmd, sizeof sql_cmd, SQL_INSERT_CMD, "scores", year, month, day, i, loadNames[i][j], j,
                                  loadScores[i][j], ",'1'");
                     else
-                        snprintf(sql_cmd, sizeof sql_cmd, insert, "scores", year, month, day, i, loadNames[i][j], j,
+                        snprintf(sql_cmd, sizeof sql_cmd, SQL_INSERT_CMD, "scores", year, month, day, i, loadNames[i][j], j,
                                  loadScores[i][j], ",'0'");
 
                     rc = sqlite3_exec(db, sql_cmd, NULL, NULL, &zErrMsg);
@@ -1043,21 +1063,24 @@ int insert_into(int argc, char **argv, struct tm *t)
                         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
                         sqlite3_free(zErrMsg);
                         sqlite3_close(db);
+                        fclose(fr);
                         return -6;
                     }
 
-                    snprintf(sql_cmd, sizeof sql_cmd, check_score, "scores2", i, j, loadNames[i][j], loadScores[i][j]);
+                    snprintf(sql_cmd, sizeof sql_cmd, 
+                        "SELECT count(*) FROM %s WHERE level=%d AND place=%d AND nick='%s' AND score=%u;", "scores2", i, j, loadNames[i][j], loadScores[i][j]);
                     rc = sqlite3_exec(db, sql_cmd, callback_count, &count, &zErrMsg);
                     if (rc) {
                         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
                         sqlite3_free(zErrMsg);
                         sqlite3_close(db);
+                        fclose(fr);
                         return -7;
                     }
 
                     if (count) continue;
 
-                    snprintf(sql_cmd, sizeof sql_cmd, insert, "scores2", year, month, day, i, loadNames[i][j], j,
+                    snprintf(sql_cmd, sizeof sql_cmd, SQL_INSERT_CMD, "scores2", year, month, day, i, loadNames[i][j], j,
                              loadScores[i][j], "");
                     printf("%s\n", sql_cmd);
                     rc = sqlite3_exec(db, sql_cmd, NULL, NULL, &zErrMsg);
@@ -1065,6 +1088,7 @@ int insert_into(int argc, char **argv, struct tm *t)
                         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
                         sqlite3_free(zErrMsg);
                         sqlite3_close(db);
+                        fclose(fr);
                         return -8;
                     }
                 }
@@ -1113,7 +1137,9 @@ int count_player_X_place(int argc, char **argv, struct tm *t)
     }
 
     int *count = &(int){0};
-    snprintf(sql_cmd, sizeof sql_cmd, countX, player, place);
+
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT count(*) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000) AS sub WHERE sub.nick='%s' AND sub.place=%d;", player, place);
     rc = sqlite3_exec(db, sql_cmd, callback_count, count, &zErrMsg);
     if( rc!=SQLITE_OK ){
       fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1203,14 +1229,14 @@ int count_top5s(int argc, char **argv, struct tm *t)
  *
  *  \return [out] None
  */
-static void download_score_file(int level)
+static void download_score_file(unsigned level)
 {
     char cmd[100];
     snprintf(cmd, sizeof cmd, download_scores_template, level /100000, (level %100000) /1000, level %1000);
-    system(cmd);
+    IGNORE_RESULT(system(cmd));
 }
 
-static int parse_score_file(int level, char (*names)[MAX_NAME_LEN + 1], int* ids, int* scores, int entries)
+static int parse_score_file(unsigned level, char (*names)[MAX_NAME_LEN + 1], unsigned* ids, unsigned* scores, int entries)
 {
     (void)entries;
 
@@ -1221,7 +1247,7 @@ static int parse_score_file(int level, char (*names)[MAX_NAME_LEN + 1], int* ids
     int rank = -1;
     int name_len = 0;
 
-    snprintf(filename, sizeof filename, "%03d.txt", level %1000);
+    snprintf(filename, sizeof filename, "%03u.txt", level %1000);
     if (bfr = fopen(filename, "rb"), bfr == NULL) {
         printf("Error reading file %s", filename);
         return 1;
@@ -1245,12 +1271,13 @@ static int parse_score_file(int level, char (*names)[MAX_NAME_LEN + 1], int* ids
             rank++;
             name_len = 0;
             snprintf(score_str, sizeof score_str, "%02X%02X%02X", buf[j], buf[j + 1], buf[j + 2]);
-            scores[rank] = strtoul(score_str, NULL, 16);
+            scores[rank] = (unsigned)strtoul(score_str, NULL, 16);
             snprintf(id_str, sizeof id_str, "%02X%02X%02X%02X", buf[j + 3], buf[j + 4], buf[j + 5], buf[j + 6]);
-            ids[rank] = strtoul(id_str, NULL, 16);
+            ids[rank] = (unsigned)strtoul(id_str, NULL, 16);
             j += 7;
         }
-        names[rank][name_len++] = buf[j];
+        assert(buf[j] <= SCHAR_MAX);
+        names[rank][name_len++] = (char)buf[j];
     }
 
     return 0;
@@ -1262,17 +1289,22 @@ int download_level_scores(int argc, char** argv, struct tm* t)
     (void)t;
 
     char names[NUM_ENTRIES][MAX_NAME_LEN + 1] = { 0 };
-    int ids[NUM_ENTRIES] = { 0 };
-    int scores[NUM_ENTRIES] = { 0 };
+    unsigned ids[NUM_ENTRIES] = { 0 };
+    unsigned scores[NUM_ENTRIES] = { 0 };
     int level = (int)strtol(argv[0], NULL, 10);
 
-    download_score_file(level);
+    if (level < 0)
+    {
+        return -1;
+    }
+
+    download_score_file((unsigned)level);
     
-    int rc = parse_score_file(level, names, ids, scores, NUM_ENTRIES);
+    int rc = parse_score_file((unsigned)level, names, ids, scores, NUM_ENTRIES);
 
     if (rc != 1) {
         for (int i = 0; i < NUM_ENTRIES; i++) {
-            printf("%d.| [%s]%6d%7d\n", i, names[i], scores[i], ids[i]);
+            printf("%d.| [%31s]%6u%7u\n", i, names[i], scores[i], ids[i]);
         }
     }
     else {
@@ -1287,18 +1319,18 @@ int download_metanet_scores(int argc, char** argv, struct tm* t)
     (void)argc;
     (void)argv;
 
-    unsigned char buffer_in[256] = { 0 };
-    unsigned char buffer_out[72] = { 0 };
-    int len;
+    char buffer_in[256] = { 0 };
+    char buffer_out[72] = { 0 };
+    size_t len;
     char* time_buf = NULL;
     FILE* bfr;
     int parse_cnt = 0;
 
-    for (int i = 0; i < NUM_LEVELS; ++i) {
+    for (unsigned i = 0; i < NUM_LEVELS; ++i) {
         download_score_file(i + 1);
     }
 
-    for (int i = 0; i < NUM_LEVELS; ++i) {
+    for (unsigned i = 0; i < NUM_LEVELS; ++i) {
         parse_cnt += parse_score_file(i + 1, loadNames[i], loadIDs[i], loadScores[i], NUM_ENTRIES);
     }
 
@@ -1320,25 +1352,25 @@ int download_metanet_scores(int argc, char** argv, struct tm* t)
         fprintf(bfr, "#*N2High-v3.0*#\n");
         for (int i = 0; i < NUM_LEVELS; ++i) {
             for (int j = 0; j < NUM_ENTRIES; ++j) {
-                len = snprintf(buffer_in, sizeof buffer_in, "%s", loadNames[i][j]);
-                base64_encode(buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
+                len = (size_t)snprintf(buffer_in, sizeof buffer_in, "%s", loadNames[i][j]);
+                base64_encode((unsigned char *)buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
                 cypher(buffer_out);
                 fprintf(bfr, "%s'", buffer_out);
 
-                len = snprintf(buffer_in, sizeof buffer_in, "%d", loadScores[i][j]);
-                base64_encode(buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
+                len = (size_t)snprintf(buffer_in, sizeof buffer_in, "%u", loadScores[i][j]);
+                base64_encode((unsigned char *)buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
                 cypher(buffer_out);
                 fprintf(bfr, "%s'", buffer_out);
 
-                len = snprintf(buffer_in, sizeof buffer_in, "%d", loadIDs[i][j]);
-                base64_encode(buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
+                len = (size_t)snprintf(buffer_in, sizeof buffer_in, "%u", loadIDs[i][j]);
+                base64_encode((unsigned char *)buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
                 cypher(buffer_out);
                 fprintf(bfr, "%s'", buffer_out);
             }
         }
 
-        len = snprintf(buffer_in, sizeof buffer_in, "%s", time_buf);
-        base64_encode(buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
+        len = (size_t)snprintf(buffer_in, sizeof buffer_in, "%s", time_buf);
+        base64_encode((unsigned char *)buffer_in, len, buffer_out, OUTPUT_LEN_IGNORED);
         cypher(buffer_out);
         fprintf(bfr, "%s", buffer_out);
 
@@ -1363,7 +1395,7 @@ int generate_level_history(int argc, char **argv, struct tm *t)
     int max_score = -1;
     char max_name[MAX_NAME_LEN + 1];
 
-    int lvl = str_to_lvl(*argv);
+    unsigned lvl = str_to_lvl(*argv);
 
     rc = sqlite3_open("highscores.db", &db);
     if( rc ){
@@ -1371,7 +1403,9 @@ int generate_level_history(int argc, char **argv, struct tm *t)
       return -1;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, count_0th_changes, empty, lvl);
+
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT count(%snick) FROM scores2 WHERE level=%u AND place=0;", "", lvl);
     rc = sqlite3_exec(db, sql_cmd, callback_count, &count[0], &zErrMsg);
     if( rc!=SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1380,13 +1414,15 @@ int generate_level_history(int argc, char **argv, struct tm *t)
         goto sqlite3_cleanup;
     }
 
-    if (changes = malloc(count[0] * sizeof *changes), changes == NULL) {
+    assert(count[0] > 0);
+    if (changes = malloc((size_t)count[0] * sizeof *changes), changes == NULL) {
         fprintf(stderr, "Dynamic allocation error for changes... \n");
         res = -3;
         goto sqlite3_cleanup;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, count_0th_changes, "DISTINCT ", lvl);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT count(%snick) FROM scores2 WHERE level=%u AND place=0;", "DISTINCT ", lvl);
     rc = sqlite3_exec(db, sql_cmd, callback_count, &count[1], &zErrMsg);
     if( rc!=SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1395,14 +1431,16 @@ int generate_level_history(int argc, char **argv, struct tm *t)
         goto changes_cleanup;
     }
 
-    if (names = malloc(count[1] * sizeof *names), names == NULL) {
+    assert(count[1] > 0);
+    if (names = malloc((size_t)count[1] * sizeof *names), names == NULL) {
         fprintf(stderr, "Dynamic allocation error for names... \n");
         res = -5;
         goto changes_cleanup;
     }
 
     gen_history_cb_cnt = 0;
-    snprintf(sql_cmd, sizeof sql_cmd, gen_history_cmd, lvl, 0);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT day, nick, score FROM scores2 WHERE level=%u AND place=%d;", lvl, 0);
     rc = sqlite3_exec(db, sql_cmd, gen_history_callback, changes, &zErrMsg);
     if( rc!=SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1416,7 +1454,8 @@ int generate_level_history(int argc, char **argv, struct tm *t)
     max_name[MAX_NAME_LEN] = '\0';
 
     distinct_nick_cb_cnt = 0;
-    snprintf(sql_cmd, sizeof sql_cmd, select_distinct_nick, "DISTINCT ", lvl, 0);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT %snick FROM scores2 WHERE level=%u and place=%d;", "DISTINCT ", lvl, 0);
     rc = sqlite3_exec(db, sql_cmd, distinct_nick_callback, names, &zErrMsg);
     if (rc) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -1432,9 +1471,9 @@ int generate_level_history(int argc, char **argv, struct tm *t)
         int flag = 0;
         printf(name_placeholder, names[i]);
         for (int j = 0; j < count[0]; ++j) {
-            yesterday.yy = year = strtol(changes[j].day, NULL, 10);
-            yesterday.mm = month = strtol(&changes[j].day[5], NULL, 10);
-            yesterday.dd = day = strtol(&changes[j].day[8], NULL, 10);
+            yesterday.yy = year = (int)strtol(changes[j].day, NULL, 10);
+            yesterday.mm = month = (int)strtol(&changes[j].day[5], NULL, 10);
+            yesterday.dd = day = (int)strtol(&changes[j].day[8], NULL, 10);
             getYesterdayDate(&yesterday);
 
             if (strncmp(names[i], changes[j].nick, MAX_NAME_LEN + 1) == 0) {
@@ -1573,7 +1612,7 @@ int generate_diff_level_history(int argc, char **argv, struct tm *t)
     int min_score = -1;
     char *zErrMsg;
 
-    int lvl = str_to_lvl(*argv);
+    unsigned lvl = str_to_lvl(*argv);
 
     rc = sqlite3_open("highscores.db", &db);
     if( rc ){
@@ -1581,7 +1620,7 @@ int generate_diff_level_history(int argc, char **argv, struct tm *t)
       return -1;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, "SELECT score FROM scores2 WHERE level=%d AND place=9 ORDER BY day ASC LIMIT 1;", lvl);
+    snprintf(sql_cmd, sizeof sql_cmd, "SELECT score FROM scores2 WHERE level=%u AND place=9 ORDER BY day ASC LIMIT 1;", lvl);
     rc = sqlite3_exec(db, sql_cmd, callback_count, &min_score, &zErrMsg);
     if( rc!=SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1597,7 +1636,8 @@ int generate_diff_level_history(int argc, char **argv, struct tm *t)
         prev_score = -1;
         printf(name_placeholder, "0th score");
         putchar('\n');
-        snprintf(sql_cmd, sizeof sql_cmd, select_distinct_score, lvl, 0);
+        snprintf(sql_cmd, sizeof sql_cmd, 
+            "SELECT day, score FROM scores2 WHERE level=%u AND place=%d;", lvl, 0);
         rc = sqlite3_exec(db, sql_cmd, distinc_scores_callback, NULL, &zErrMsg);
         if( rc!=SQLITE_OK ){
             fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1613,7 +1653,8 @@ int generate_diff_level_history(int argc, char **argv, struct tm *t)
         prev_score = -1;
         printf(name_placeholder, "1st score");
         putchar('\n');
-        snprintf(sql_cmd, sizeof sql_cmd, select_distinct_score, lvl, 1);
+        snprintf(sql_cmd, sizeof sql_cmd, 
+            "SELECT day, score FROM scores2 WHERE level=%u AND place=%d;", lvl, 1);
         rc = sqlite3_exec(db, sql_cmd, distinc_scores_callback, NULL, &zErrMsg);
         if( rc!=SQLITE_OK ){
             fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1629,7 +1670,8 @@ int generate_diff_level_history(int argc, char **argv, struct tm *t)
         prev_score = -1;
         printf(name_placeholder, "9th score");
         putchar('\n');
-        snprintf(sql_cmd, sizeof sql_cmd, select_distinct_score, lvl, 9);
+        snprintf(sql_cmd, sizeof sql_cmd, 
+            "SELECT day, score FROM scores2 WHERE level=%u AND place=%d;", lvl, 9);
         rc = sqlite3_exec(db, sql_cmd, distinc_scores_callback, NULL, &zErrMsg);
         if( rc!=SQLITE_OK ){
             fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -1667,7 +1709,7 @@ int update_charts(int argc, char **argv, struct tm *t)
         goto cleanup;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, "%s", count_distinc_days);
+    snprintf(sql_cmd, sizeof sql_cmd, "%s", "SELECT count(DISTINCT day) FROM scores;");
     sqlite3_exec(db, sql_cmd, callback_count, &distinct_days, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -1680,7 +1722,7 @@ int update_charts(int argc, char **argv, struct tm *t)
     }
 
     if (1) { // Timeline charts!
-        unsigned chart_pick_flag = strtoul(*argv, NULL, 0);
+        unsigned chart_pick_flag = (unsigned)strtoul(*argv, NULL, 0);
 
 #define PICK_0THS_POS       (0U)
 #define PICK_PURE_0THS_POS  (1U)
@@ -1690,6 +1732,8 @@ int update_charts(int argc, char **argv, struct tm *t)
 #define PICK_AVG_POS        (5U)
 
         if ((chart_pick_flag >> PICK_0THS_POS) & 1U) {    //0ths
+
+            // ToDo: see if we can refactor this, one function dealing with all timeline charts.
             if (fw = fopen("0thRankingsChart.htm", "w"), fw == NULL) {
                 fprintf(stderr, "Error in opening file for writing!\n");
                 goto cleanup;
@@ -1701,7 +1745,7 @@ int update_charts(int argc, char **argv, struct tm *t)
                 fputs(buffer, fw);
             }
 
-            for (int i = 0; i < NUM_PLAYERS; ++i) {
+            for (size_t i = 0; i < NUM_PLAYERS; ++i) {
                 if (i != 10)
                     fprintf(fw, "\t\tname: '%s',\n\t\twebsite: 'https://nv2.fandom.com/wiki/%c%s',\n\t\tdata: [\n", players[i], toupper(*players[i]), players[i] + 1);
                 else
@@ -1745,7 +1789,7 @@ int update_charts(int argc, char **argv, struct tm *t)
                 fputs(buffer, fw);
             }
 
-            for (int i = 0; i < NUM_PLAYERS; ++i) {
+            for (size_t i = 0; i < NUM_PLAYERS; ++i) {
                 if (i != 10)
                     fprintf(fw, "\t\tname: '%s',\n\t\twebsite: 'https://nv2.fandom.com/wiki/%c%s',\n\t\tdata: [\n", players[i], toupper(*players[i]), players[i] + 1);
                 else
@@ -1778,7 +1822,7 @@ int update_charts(int argc, char **argv, struct tm *t)
         if ((chart_pick_flag >> PICK_TOP10_POS) & 1U) {   // Top10s
             if (fw = fopen("Top10RankingsChart.htm", "w"), fw == NULL) {
                 fprintf(stderr, "Error in opening file for writing!\n");
-                return -4;
+                goto cleanup;
             }
 
             while (fgets(buffer, sizeof buffer, f_template) != NULL) {
@@ -1787,7 +1831,7 @@ int update_charts(int argc, char **argv, struct tm *t)
                 fputs(buffer, fw);
             }
 
-            for (int i = 0; i < NUM_PLAYERS; ++i) {
+            for (size_t i = 0; i < NUM_PLAYERS; ++i) {
                 if (i != 10)
                     fprintf(fw, "\t\tname: '%s',\n\t\twebsite: 'https://nv2.fandom.com/wiki/%c%s',\n\t\tdata: [\n", players[i], toupper(*players[i]), players[i] + 1);
                 else
@@ -1829,7 +1873,7 @@ int update_charts(int argc, char **argv, struct tm *t)
                 fputs(buffer, fw);
             }
 
-            for (int i = 0; i < NUM_PLAYERS; ++i) {
+            for (size_t i = 0; i < NUM_PLAYERS; ++i) {
                 if (i != 10)
                     fprintf(fw, "\t\tname: '%s',\n\t\twebsite: 'https://nv2.fandom.com/wiki/%c%s',\n\t\tdata: [\n", players[i], toupper(*players[i]), players[i] + 1);
                 else
@@ -1871,7 +1915,7 @@ int update_charts(int argc, char **argv, struct tm *t)
                 fputs(buffer, fw);
             }
 
-            for (int i = 0; i < NUM_PLAYERS; ++i) {
+            for (size_t i = 0; i < NUM_PLAYERS; ++i) {
                 if (i != 10)
                     fprintf(fw, "\t\tname: '%s',\n\t\twebsite: 'https://nv2.fandom.com/wiki/%c%s',\n\t\tdata: [\n", players[i], toupper(*players[i]), players[i] + 1);
                 else
@@ -1913,7 +1957,7 @@ int update_charts(int argc, char **argv, struct tm *t)
                 fputs(buffer, fw);
             }
 
-            for (int i = 0; i < NUM_PLAYERS; ++i) {
+            for (size_t i = 0; i < NUM_PLAYERS; ++i) {
                 if (i != 10)
                     fprintf(fw, "\t\tname: '%s',\n\t\twebsite: 'https://nv2.fandom.com/wiki/%c%s',\n\t\tdata: [\n", players[i], toupper(*players[i]), players[i] + 1);
                 else
@@ -2046,7 +2090,8 @@ int update_charts(int argc, char **argv, struct tm *t)
             );
             struct sql_callback_data* data = &(struct sql_callback_data) {
                 .format = "145", 
-                .stats = (struct stats[20]){ { 0 } }
+                .stats_cnt = 0,
+                .stats = (struct stats[20]){ 0 }
             };
             rc = sqlite3_exec(db, sql_cmd, callback_stats, data, &zErrMsg);
             if (rc) {
@@ -2096,7 +2141,8 @@ int update_charts(int argc, char **argv, struct tm *t)
             );
             struct sql_callback_data* data = &(struct sql_callback_data) {
                 .format = "146", 
-                .stats = (struct stats[20]){ { 0 } }
+                .stats_cnt = 0,
+                .stats = (struct stats[20]){ 0 }
             };
             rc = sqlite3_exec(db, sql_cmd, callback_stats, data, &zErrMsg);
             if (rc) {
@@ -2131,7 +2177,7 @@ int update_charts(int argc, char **argv, struct tm *t)
     }
 
 cleanup:
-    fclose(f_template);
+    if (f_template) fclose(f_template);
     sqlite3_close(db);
 
     return SQLITE_OK;
@@ -2163,7 +2209,7 @@ int set_tied_scores(int argc, char **argv, struct tm *t)
         return -10;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, "%s", count_distinc_days);
+    snprintf(sql_cmd, sizeof sql_cmd, "%s", "SELECT count(DISTINCT day) FROM scores;");
     sqlite3_exec(db, sql_cmd, callback_count, &distinct_days, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2172,7 +2218,7 @@ int set_tied_scores(int argc, char **argv, struct tm *t)
     }
 
     for (unsigned int i = 0; i < distinct_days; ++i) {
-        snprintf(sql_cmd, sizeof sql_cmd, select_day, date);
+        snprintf(sql_cmd, sizeof sql_cmd, "SELECT day FROM scores WHERE day>'%s' LIMIT 1;", date);
         sqlite3_exec(db, sql_cmd, callback_day, date, &zErrMsg);
         if (rc != SQLITE_OK) {
             fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2180,7 +2226,8 @@ int set_tied_scores(int argc, char **argv, struct tm *t)
             return -3;
         }
         for (int j = 0; j < NUM_LEVELS; ++j) {
-            snprintf(sql_cmd, sizeof sql_cmd, select_score, date, j, 0);
+            snprintf(sql_cmd, sizeof sql_cmd, 
+                "SELECT score FROM scores WHERE day='%s' AND level=%d AND place=%d;", date, j, 0);
             sqlite3_exec(db, sql_cmd, callback_count, &score_0th, &zErrMsg);
             if (rc != SQLITE_OK) {
                 fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2188,7 +2235,8 @@ int set_tied_scores(int argc, char **argv, struct tm *t)
                 return -4;
             }
             for (int k = 1; k < NUM_ENTRIES; ++k) {
-                snprintf(sql_cmd, sizeof sql_cmd, select_score, date, j, k);
+                snprintf(sql_cmd, sizeof sql_cmd, 
+                    "SELECT score FROM scores WHERE day='%s' AND level=%d AND place=%d;", date, j, k);
                 sqlite3_exec(db, sql_cmd, callback_count, &curr_score, &zErrMsg);
                 if (rc != SQLITE_OK) {
                     fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2196,7 +2244,8 @@ int set_tied_scores(int argc, char **argv, struct tm *t)
                     return -4;
                 }
                 if (curr_score == score_0th) {
-                    snprintf(sql_cmd, sizeof sql_cmd, update_flag, date, j, k);
+                    snprintf(sql_cmd, sizeof sql_cmd, 
+                        "UPDATE scores SET flag_tied=1 WHERE day='%s' AND level=%d AND place=%d;", date, j, k);
                     sqlite3_exec(db, sql_cmd, callback_count, &curr_score, &zErrMsg);
                     if (rc != SQLITE_OK) {
                         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2237,7 +2286,8 @@ int show_older_0ths(int argc, char **argv, struct tm *t)
     }
 
     row_cnt = 0;
-    snprintf(sql_cmd, sizeof sql_cmd, pick_older_0ths, *argv);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT level/5 as ep, level%%5 as lvl FROM scores2 GROUP BY level HAVING count(CASE WHEN day>='%s' and place=0 THEN 1 ELSE NULL END)=0;", *argv);
     rc = sqlite3_exec(db, sql_cmd, callback_show_level, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2273,7 +2323,8 @@ int generate_histogram(int argc, char **argv, struct tm *t)
     }
 
     generic_int_placeholder = 0; // Keeps maximum value of histogram, which is filled in callback_histogram
-    snprintf(sql_cmd, sizeof sql_cmd, "SELECT sub.place, count(sub.place) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' GROUP BY sub.place;", player);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT sub.place, count(sub.place) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' GROUP BY sub.place;", player);
     sqlite3_exec(db, sql_cmd, callback_histogram, histogram, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2303,7 +2354,8 @@ int generate_changes_list(int argc, char **argv, struct tm *t)
       return -1;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, "SELECT nick, level, place FROM scores WHERE day<='%s' ORDER BY day DESC, level ASC, place ASC LIMIT 6000;", argv[0]);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT nick, level, place FROM scores WHERE day<='%s' ORDER BY day DESC, level ASC, place ASC LIMIT 6000;", argv[0]);
     sqlite3_exec(db, sql_cmd, callback_fill_leaderboard, oldNames, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2416,7 +2468,8 @@ int generate_heatmap(int argc, char **argv, struct tm *t)
     }
 
     // Read number of rows.
-    snprintf(sql_cmd, sizeof sql_cmd, count_player_top10s, player);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT count(sub.place) FROM (SELECT nick, place FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s'", player);
     sqlite3_exec(db, sql_cmd, callback_count, &generic_int_placeholder, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2426,7 +2479,8 @@ int generate_heatmap(int argc, char **argv, struct tm *t)
     }
 
     row_cnt = 0;
-    snprintf(sql_cmd, sizeof sql_cmd, player_spots, player);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT sub.level, sub.place FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' ORDER BY sub.level", player);
     sqlite3_exec(db, sql_cmd, callback_heatmap, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2441,7 +2495,8 @@ int generate_heatmap(int argc, char **argv, struct tm *t)
     fputs(histogram_chart, fw);
 
     row_cnt = 0;
-    snprintf(sql_cmd, sizeof sql_cmd, "SELECT sub.place, count(sub.place) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' GROUP BY sub.place;", player);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT sub.place, count(sub.place) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' GROUP BY sub.place;", player);
     sqlite3_exec(db, sql_cmd, callback_histogram, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2467,15 +2522,20 @@ int export_level_data(int argc, char **argv, struct tm *t)
     (void)argc;
     (void)t;
 
-    unsigned int level_id = strtoul(*argv, NULL, 10);
+    unsigned long lvl = strtoul(*argv, NULL, 10);
 
-    if (level_id < 1001)
+    if (lvl < 1001)
         return -1;
 
+    // ToDo: Handle when user levels reach ID of at least a million
+    if (lvl > 999999U)
+        return -2;
+
+    unsigned int level_id = (unsigned) lvl;
     char filename[12], cmd[256];
     snprintf(filename, sizeof filename, "%u.txt", level_id);
     snprintf(cmd, sizeof cmd, download_demos_template, filename);
-    system(cmd);
+    IGNORE_RESULT(system(cmd));
 
     FILE *fr = NULL;
     if (fr = fopen(filename, "r"), fr == NULL) {
@@ -2484,21 +2544,21 @@ int export_level_data(int argc, char **argv, struct tm *t)
     }
 
     int c;
-    unsigned int base64_map_len = 0;
+    unsigned int encoded_map_len = 0;
     // data is base64 map data
-    unsigned char data[16384] = {0};
-    while (base64_map_len < sizeof data && (c = fgetc(fr)) != EOF)
-        data[base64_map_len++] = (unsigned char)c;
+    char encoded_data[16384] = {0};
+    while (encoded_map_len < sizeof encoded_data && (c = fgetc(fr)) != EOF)
+        encoded_data[encoded_map_len++] = (char)c;
 
     fclose(fr);
 
     size_t decoded_len;
-    char decoded_map_data[12288];
-    base64_decode(data, base64_map_len, (unsigned char*)decoded_map_data, &decoded_len);
+    unsigned char decoded_map_data[12288];
+    base64_decode(encoded_data, encoded_map_len, decoded_map_data, &decoded_len);
 
-    // data is uncompressed_map_data
-    unsigned long dist_len = sizeof data;
-    int res = uncompress(data, &dist_len, decoded_map_data, (uLong)decoded_len);
+    unsigned char uncompressed_map_data[16384];
+    unsigned long uncompressed_len = sizeof uncompressed_map_data;
+    int res = uncompress(uncompressed_map_data, &uncompressed_len, decoded_map_data, (uLong)decoded_len);
     if (res != Z_OK) {
         fprintf(stderr, "Error while uncompressing %d!\n", res);
         return -3;
@@ -2506,19 +2566,19 @@ int export_level_data(int argc, char **argv, struct tm *t)
 
     unsigned int title_len;
     char title[256] = {0};
-    title_len = data[0] * 16 + data[1];
+    title_len = uncompressed_map_data[0] * 16U + uncompressed_map_data[1];
     if (title_len >= sizeof title) {
-        fprintf(stderr, "TL;DR %d!\n", title_len);
+        fprintf(stderr, "TL;DR %u!\n", title_len);
         return -4;
     }
 
     putchar('%');
-    printf("%.*s", title_len, data + 2);
+    printf("%.*s", title_len, (char *)uncompressed_map_data + 2);
     putchar('#');
 
-    for (size_t i = title_len + 2; i < dist_len; ++i) {
-        putchar("0123456789abcdef"[data[i] & 0xF]);
-        putchar("0123456789abcdef"[data[i] >> 4]);
+    for (size_t i = title_len + 2; i < uncompressed_len; ++i) {
+        putchar("0123456789abcdef"[uncompressed_map_data[i] & 0xF]);
+        putchar("0123456789abcdef"[uncompressed_map_data[i] >> 4]);
     }
 
     putchar('#');
@@ -2531,7 +2591,7 @@ static int export_demo_data_inner(unsigned int level_id, int player_id, const ch
 
     snprintf(filename, sizeof filename, "%u-%d.txt", level_id, player_id);
     snprintf(cmd, sizeof cmd, download_demos_template, filename);
-    system(cmd);
+    IGNORE_RESULT(system(cmd));
 
     FILE *fr = NULL;
     if (fr = fopen(filename, "r"), fr == NULL) {
@@ -2541,9 +2601,9 @@ static int export_demo_data_inner(unsigned int level_id, int player_id, const ch
 
     int c;
     unsigned int base64_demo_len = 0;
-    unsigned char base64_demo_data[4096] = {0};
+    char base64_demo_data[4096] = {0};
     while (base64_demo_len < sizeof base64_demo_data && (c = fgetc(fr)) != EOF)
-        base64_demo_data[base64_demo_len++] = (unsigned char)c;
+        base64_demo_data[base64_demo_len++] = (char)c;
 
     fclose(fr);
 
@@ -2552,8 +2612,8 @@ static int export_demo_data_inner(unsigned int level_id, int player_id, const ch
     base64_decode(base64_demo_data, base64_demo_len, decoded_demo_data, &decoded_len);
 
     unsigned char uncompressed_demo_data[8192];
-    unsigned long dist_len = sizeof uncompressed_demo_data;
-    int rc = uncompress(uncompressed_demo_data, &dist_len, decoded_demo_data, (uLong)decoded_len);
+    unsigned long uncompressed_demo_len = sizeof uncompressed_demo_data;
+    int rc = uncompress(uncompressed_demo_data, &uncompressed_demo_len, decoded_demo_data, (uLong)decoded_len);
     if (rc != Z_OK) {
         fprintf(stderr, "Error while uncompressing %d!\n", rc);
         return -5;
@@ -2573,17 +2633,17 @@ static int export_demo_data_inner(unsigned int level_id, int player_id, const ch
 
         double t = 90.0;
         char *actions[] = {"N.", "J.", "L.", "LJ.", "R.", "RJ.", "LR.", "LRJ."};
-        for (size_t i = 0; i < dist_len; ++i, t -= 0.01666666) {
+        for (size_t i = 0; i < uncompressed_demo_len; ++i, t -= 0.01666666) {
             if (uncompressed_demo_data[i] < 0x8)
                 printf("%5.3f\t%s\n", t, actions[uncompressed_demo_data[i]]);
             else
                 printf("X.");
         }
 
-        printf("\n\nDemo length: %lu\n", dist_len - 2);
+        printf("\n\nDemo length: %lu\n", uncompressed_demo_len - 2);
 #else
         char actions[] = {'0','1','2','3','4','5','6','7'};
-        for (size_t i = 0; i < dist_len; ++i) {
+        for (size_t i = 0; i < uncompressed_demo_len; ++i) {
             if (uncompressed_demo_data[i] < 0x8)
                 putchar(actions[uncompressed_demo_data[i]]);
             else
@@ -2592,20 +2652,15 @@ static int export_demo_data_inner(unsigned int level_id, int player_id, const ch
 #endif
     }
 
-    return dist_len - 2;
+    return (int)(uncompressed_demo_len - 2);
 }
-// TODO: make a function which encapuslates this and handles sql database on its own
-//
-// TODO: int export_demo_data(int level_id, int player_id);
-// TODO:
+
 int export_demo_data(int argc, char **argv, struct tm *t)
 {
     (void)argc;
     (void)t;
 
-    char *ptr;
-    unsigned int level_id = strtoul(*argv++, &ptr, 10);
-    if (*ptr) level_id = level_id * 5 + ptr[1] - '0' + 1;
+    unsigned int level_id = str_to_lvl(*argv++) + 1;
 
     char *player_nick = *argv;
 
@@ -2619,7 +2674,8 @@ int export_demo_data(int argc, char **argv, struct tm *t)
         return -1;
     }
 
-    snprintf(sql_cmd, sizeof sql_cmd, get_player_id, player_nick);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT player_id FROM players WHERE nick='%s';", player_nick);
     rc = sqlite3_exec(db, sql_cmd, callback_count, &player_id, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2667,9 +2723,9 @@ int produce_compressed_demo(int argc, char **argv, struct tm *t)
         return -2;
     }
 
-    unsigned char encoded_demo[4096];
+    char encoded_demo[4096];
     base64_encode(compressed_demo, compressed_len, encoded_demo, OUTPUT_LEN_IGNORED);
-    for (unsigned char *x = encoded_demo; *x; ++x)
+    for (char *x = encoded_demo; *x; ++x)
         putchar(*x);
 
     free(compressed_demo);
@@ -2750,9 +2806,10 @@ int get_leaderboard(int argc, char **argv, struct tm *t)
         return -1;
     }
 
-    int lvl = str_to_lvl(*argv);
+    unsigned lvl = str_to_lvl(*argv);
 
-    snprintf(sql_cmd, sizeof sql_cmd, "SELECT place, nick, score FROM scores where level=%d order by day desc, place limit 10;", lvl);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT place, nick, score FROM scores where level=%u order by day desc, place limit 10;", lvl);
     rc = sqlite3_exec(db, sql_cmd, callback_leaderboard, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Error while executing sql query: %s", zErrMsg);
@@ -2788,7 +2845,8 @@ int show_total_score(int argc, char **argv, struct tm *t)
 
     int player_id = -1;
 
-    snprintf(sql_cmd, sizeof sql_cmd, get_player_id, player);
+    snprintf(sql_cmd, sizeof sql_cmd, 
+        "SELECT player_id FROM players WHERE nick='%s';", player);
     rc = sqlite3_exec(db, sql_cmd, callback_count, &player_id, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2811,7 +2869,7 @@ int show_total_score(int argc, char **argv, struct tm *t)
         return -4;
     }
 
-    rc = sqlite3_exec(db, community_total_score, callback_count, &total_community_score, &zErrMsg);
+    rc = sqlite3_exec(db, "SELECT sum(score) FROM tmp WHERE place=0;", callback_count, &total_community_score, &zErrMsg);
     if (rc) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
@@ -2819,10 +2877,10 @@ int show_total_score(int argc, char **argv, struct tm *t)
         return -5;
     }
 
-    for (int i = 0; i < NUM_LEVELS; ++i) {
+    for (size_t i = 0; i < NUM_LEVELS; ++i) {
         int score = -1;
 
-        snprintf(sql_cmd, sizeof sql_cmd, "SELECT score FROM tmp WHERE level=%d AND nick='%s';", i, player);
+        snprintf(sql_cmd, sizeof sql_cmd, "SELECT score FROM tmp WHERE level=%zu AND nick='%s';", i, player);
         rc = sqlite3_exec(db, sql_cmd, callback_count, &score, &zErrMsg);
         if (rc != SQLITE_OK) {
             fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2840,7 +2898,7 @@ int show_total_score(int argc, char **argv, struct tm *t)
             int player_0th_id = -1;
 
             snprintf(sql_cmd, sizeof sql_cmd,
-                     "SELECT player_id FROM players INNER JOIN tmp WHERE players.nick=tmp.nick AND tmp.level=%d AND tmp.place=0;", i);
+                     "SELECT player_id FROM players INNER JOIN tmp WHERE players.nick=tmp.nick AND tmp.level=%zu AND tmp.place=0;", i);
             rc = sqlite3_exec(db, sql_cmd, callback_count, &player_0th_id, &zErrMsg);
             if (rc != SQLITE_OK) {
                 fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2850,16 +2908,17 @@ int show_total_score(int argc, char **argv, struct tm *t)
             }
 
             if (player_0th_id < 0) {
-                fprintf(stderr, "ID for 0th owner on level %02d-%d was not found!\n", i/5, i%5);
+                fprintf(stderr, "ID for 0th owner on level %02zu-%zu was not found!\n", i/5, i%5);
                 sqlite3_close(db);
                 return -8;
             }
 
-            top_score_frame_cnt = export_demo_data_inner(i + 1U, player_0th_id, "0th owner", 0);
-            frame_cnt = export_demo_data_inner(i + 1U, player_id, player, 0);
+            top_score_frame_cnt = export_demo_data_inner((unsigned)i + 1U, player_0th_id, "0th owner", 0);
+            frame_cnt = export_demo_data_inner((unsigned)i + 1U, player_id, player, 0);
 
             int score_0th;
-            snprintf(sql_cmd, sizeof sql_cmd,"SELECT score FROM tmp WHERE level=%d AND place=0;", i);
+            snprintf(sql_cmd, sizeof sql_cmd, 
+                "SELECT score FROM tmp WHERE level=%zu AND place=0;", i);
             rc = sqlite3_exec(db, sql_cmd, callback_count, &score_0th, &zErrMsg);
             if (rc != SQLITE_OK) {
                 fprintf(stderr, "SQL Error: %s\n", zErrMsg);
@@ -2871,9 +2930,10 @@ int show_total_score(int argc, char **argv, struct tm *t)
             // This isn't strictly correct
             // As player for which we try to obtain total score isn't present on leaderboard,
             // we count frames for both 0th owner of the map and for player in question, and
-            // then use this difference to produce actual score
+            // then use this difference to produce actual score, despite not knowing if plyer
+            // in question collected all gold pieces.
             if (top_score_frame_cnt > 0 && frame_cnt > 0)
-                // TODO: Get the 0th score from DB
+                // ToDo: Get the 0th score from DB
                 total_score += score_0th - (frame_cnt - top_score_frame_cnt);
         }
     }
@@ -2908,9 +2968,9 @@ int get_maxed_levels(int argc, char **argv, struct tm *t)
         return 1;
     }
 
-    rc = sqlite3_exec(db, maxed_levels_query_cmd, callback_show_level, NULL, &zErrMsg);
+    rc = sqlite3_exec(db, "SELECT tmp.level/5, tmp.level%5 FROM (SELECT * FROM scores ORDER BY DAY DESC LIMIT 6000) AS tmp GROUP BY tmp.level HAVING count(DISTINCT tmp.score)=1;", callback_show_level, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "Error while executing command:\n[%s]\nError: %s", maxed_levels_query_cmd, zErrMsg);
+        fprintf(stderr, "SQL Error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         sqlite3_close(db);
         return 2;
@@ -3048,10 +3108,12 @@ int generate_activity(int argc, char **argv, struct tm *t)
         fprintf(stderr, "Couldn't create temporary table:\n[%s]\n", zErrMsg);
         sqlite3_free(zErrMsg);
         sqlite3_close(db);
+        fclose(f_template);
         return 2;
     }
 
     fprintf(stdout, "\t\t]\n\t}]\n})\n\t\t</script>\n\t</body>\n</html>\n");
+    fclose(f_template);
 cleanup:
     sqlite3_close(db);
 

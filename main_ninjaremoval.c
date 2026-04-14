@@ -1,4 +1,6 @@
+#include <assert.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stddef.h>
 
@@ -33,19 +35,20 @@ int main(int argc, char **argv)
 	putchar('1');
 	putchar('0');
 
-	unsigned long long ninja_pwr[] = { 256, 65536, 1, 16 };
+	unsigned ninja_pwr[] = { 256, 65536, 1, 16 };
 	unsigned ninjas = 0;
 
 	// Read ninja object count
 	for (size_t i = 0; i < 4U; i++) {
 		ch = fgetc(fr);
 
-		int ch_value;
+		unsigned ch_value;
 		if (isdigit(ch))
-			ch_value = ch - '0';
-		else {
-			ch_value = 10 + ch - 'a';
-		}
+			ch_value = (unsigned)(ch - '0');
+		else if (isxdigit(ch))
+			ch_value = (unsigned)(10 + tolower(ch) - 'a');
+		else
+			assert(false);
 			 
 		ninjas += ninja_pwr[i] * ch_value;
 	}
