@@ -28,13 +28,10 @@ add_executable(nv2ninjaremoval
 
 if(MSVC)
     target_compile_options(nv2ninjaremoval PRIVATE
-        /O2
-        /Oi
-        /GL
-        /Gy
+        $<$<NOT:$<CONFIG:Debug>>:/O2 /Oi /GL /Gy>
     )
     target_link_options(nv2ninjaremoval PRIVATE
-        /LTCG
+        $<$<NOT:$<CONFIG:Debug>>:/LTCG>
     )
 else()
     target_compile_options(nv2ninjaremoval PRIVATE
