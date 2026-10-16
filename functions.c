@@ -103,44 +103,6 @@ static const char *curr_header = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<h
                             "<header id=\"header-timeline\">\n\t\t<h1>Welcome to</h1>\n\t\t<h1>Nv2 latest charts</h1>\n\n\t\t<nav>\n\t\t<ul>\n\t\t\t<li><a href=\"../index.htm\">"
                             "Home</a></li\n\t\t\t><li><a href=\"../about.htm\">About</a></li>\n\t\t</ul>\n\t\t</nav>\n\t</header>\n\n" };
 
-//! Hard template for heatmap pages header and starting body
-static const char *player_heatmap = { "<!DOCTYPE HTML>\n<html lang=\"en-US\">\n\t<head>\n\t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n\t\t"
-                       "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\t\t<title>Heatmap Demo</title>\n\n\n\n\t\t<link rel=\"stylesheet\" type=\"text/css\" href=\"../../css/styles.css\">"
-                       "\n\t</head>\n\t<body>\n\t<script src=\"../../code/highcharts.js\"></script>\n\t<script src=\"../../code/modules/heatmap.js\"></script>\n\t<script src=\"../../code/modules/exporting.js\"></script>\n\t"
-                       "<script src=\"../../code/modules/export-data.js\"></script>\n\n\t<header id=\"header-timeline\">\n\t\t<h1>Welcome to</h1>\n\t\t<h1>Nv2 heatmaps</h1>\n\n\t\t<nav>\n\t\t<ul>\n\t\t\t<li><a href="
-                       "\"../../index.htm\">Home</a></li\n\t\t\t><li><a href=\"shomman-heatmap.htm\">shomman</a></li\n\t\t\t><li><a href=\"eddymataga-heatmap.htm\">EddyMataGallos</a></li\n\t\t\t"
-                       "><li><a href=\"oxymoron93-heatmap.htm\">oxymoron93</a></li\n\t\t\t><li><a href=\"jp27ace-heatmap.htm\">jp27ace</a></li\n\t\t\t><li><a href=\"kkstrong-heatmap.htm\">kkstrong</a></li\n\t\t\t"
-                       "><li><a href=\"cooperverd-heatmap.htm\">cooperverdon</a></li\n\t\t\t><li><a href=\"swipenet-heatmap.htm\">swipenet</a></li\n\t\t\t><li><a href=\"natakial2-heatmap.htm\">natakial2</a></li\n\t\t\t"
-                       "><li><a href=\"polt-heatmap.htm\">Polt</a></li\n\t\t\t><li><a href=\"v3l0c1t4-heatmap.htm\">V3L0C1T4</a></li\n\t\t\t><li><a href=\"danielr-heatmap.htm\">danielr</a></li\n\t\t\t"
-                       "><li><a href=\"gnarcissis-heatmap.htm\">Gnarcissist</a></li\n\t\t\t><li><a href=\"icy-sole-heatmap.htm\">Icy-Sole</a></li\n\t\t\t><li><a href=\"oleary15-heatmap.htm\">Oleary15</a></li\n\t\t\t"
-                       "><li><a href=\"patfelix-heatmap.htm\">patfelix</a></li\n\t\t\t><li><a href=\"thisguy248-heatmap.htm\">Thisguy248</a></li\n\t\t\t><li><a href=\"btoasterbo-heatmap.htm\">BtoasterBoy</a></li\n\t\t\t"
-                       "><li><a href=\"tailow-heatmap.htm\">tailow</a></li\n\t\t\t><li><a href=\"pzyll-heatmap.htm\">pzylL</a></li\n\t\t\t><li><a href=\"golfkid-heatmap.htm\">golfkid</a></li\n\t\t\t"
-                       "><li><a href=\"../../about.htm\">About</a></li>\n\t\t</ul>\n\t\t</nav>\n\t</header>\n\n\t<div id=\"container\" style=\"min-width: 310px; height: 600px; margin: 0 auto\"></div>"
-                       "\n\n\t\t<script type=\"text/javascript\">\n\n" };
-
-//! Template for rest of the heatmap page for particular player
-static const char *heatmap = { "Highcharts.chart('container', {\n\n\tchart: {\n\t\ttype: 'heatmap',\n\t\tmarginTop: 40,\n\t\tmarginBottom: 80,\n\t\tplotBorderWidth: 1\n\t},\n\n\n\ttitle: {\n\t\ttext: '%s positions'\n\t},"
-                        "\n\n\txAxis: {\n\t\tcategories: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25',"
-                        " '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59',"
-                        " '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80', '81', '82', '83', '84', '85', '86', '87', '88', '89', '90',"
-                        " '91', '92', '93', '94', '95', '96', '97', '98', '99', '100', '101', '102', '103', '104', '105', '106', '107', '108', '109', '110', '111', '112', '113', '114', '115', '116', '117', '118', '119']\n\t},\n\n\t"
-                        "yAxis: {\n\t\tcategories: ['0', '1', '2', '3', '4'],\n\t\ttitle: null\n\t},\n\n\tcolorAxis: {\n\t\tmin: 0,\n\t\tdataClassColor: 'category',\n\t\tdataClasses: [{\n\t\t\tcolor: '#FF0000',"
-                        "\n\t\t\tfrom: 0,\n\t\t\tname: '0th',\n\t\t\tto: 0\n\t\t}, {\n\t\t\tcolor: '#FF6666',\n\t\t\tfrom: 1,\n\t\t\tname: '1-4',\n\t\t\tto: 4\n\t\t}, {\n\t\t\tcolor: '#FFDDDD',\n\t\t\tfrom: 5,\n\t\t\tname: '5-9',"
-                        "\n\t\t\tto: 9\n\t\t}, {\n\t\t\tcolor: '#000000',\n\t\t\tfrom: 10,\n\t\t\tname: 'No score',\n\t\t\tto: 10\n\t\t}]\n\t},\n\n\ttooltip: {\n\t\tformatter: function () {\n\t\t\treturn '<b>'"
-                        " + this.series.xAxis.categories[this.point.x] + '</b>-<b>' + this.series.yAxis.categories[this.point.y] + '</b><br><b>pos: ' + (this.point.value === 10 ? 'X' : this.point.value) + '</b>';\n\t\t}\n\t},"
-                        "\n\n\tplotOptions: {\n\t\tseries: {\n\t\t\tpoint: {\n\t\t\t\tevents: {\n\t\t\t\t\tclick: function () {\n\t\t\t\t\t\tlet str = 'https://nv2.fandom.com/wiki/';\n\t\t\t\t\t\tif (Number(this.options.x) > 109)\n\t\t\t\t\t\t\t"
-                        "str = str + 'B' + Number(this.options.x) %% 10;\n\t\t\t\t\t\telse if (Number(this.options.x) > 99)\n\t\t\t\t\t\t\tstr = str + 'A' + Number(this.options.x) %% 10;\n\t\t\t\t\t\telse if (Number(this.options.x) < 10)\n\t\t\t\t\t\t\t"
-                        "str = str + '0' + Number(this.options.x);\n\t\t\t\t\t\telse\n\t\t\t\t\t\t\tstr = str + this.options.x;\n\t\t\t\t\t\tstr = str + '-' + this.options.y;\n\t\t\t\t\t\twindow.location.href = str;\n\t\t\t\t\t"
-                        "}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t},\n\n\tseries: [{\n\t\tname: 'Position per level',\n\t\tborderWidth: 1,\n\t\tdata: [" };
-
-//! Hard template for histogram chart on heatmap page
-static const char *histogram_chart = { "Highcharts.chart('container2', {\n\tchart: {\n\t\ttype: 'column',\n\t},\n\ttitle: {\n\t\ttext: 'Positions histogram'\n\t},\n\txAxis: {\n\t\tcategories: ['0th', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th']"
-                                "\n\t},\n\tyAxis: {\n\t\tmin: 0,\n\t\ttitle: {\n\t\t\ttext: 'Positions histogram'\n\t\t},\n\t\tstackLabels: {\n\t\t\tenabled: true,\n\t\t\tstyle: {\n\t\t\t\tfontWeight: 'bold',\n\t\t\t\tcolor: ( //theme"
-                                "\n\t\t\t\tHighcharts.defaultOptions.title.style && Highcharts.defaultOptions.title.style.color) || 'gray'\n\t\t\t}\n\t\t}\n\t},\n\tlegend: {\n\t\talign: 'right',\n\t\tx: -30,\n\t\tverticalAlign: 'top',\n\t\ty: 25,\n\t\t"
-                                "backgroundColor: Highcharts.defaultOptions.legend.backgroundColor || 'white',\n\t\tborderColor: '#CCC',\n\t\tborderWidth: 1,\n\t\tshadow: false\n\t},\n\ttooltip: {\n\t\theaderFormat: '<b>{point.x}</b><br/>',\n\t\t"
-                                "pointFormat: '{series.name}: {point.y}<br/>'\n\t},\n\tplotOptions: {\n\t\tcolumn: {\n\t\t\tpointPadding: 0,\n\t\t\tborderWidth: 0,\n\t\t\tgroupPadding: 0,\n\t\t\tstacking: 'normal',\n\t\t\tdataLabels: {\n\t\t\t\t"
-                                "enabled: false\n\t\t\t}\n\t\t}\n\t},\n\tseries: [{\n\t\tname: 'Number of positions',\n\t\tdata: [" };
-
 //! Timeline charts file names
 const char *chart_files[] = {"0thRankingsChart.htm", "0thRankingsNoTiesChart.htm", "Top10RankingsChart.htm", "Top5RankingsChart.htm", "PointsRankingsChart.htm", "AverageRankingsChart.htm"};
 //! Name placeholder used in callback functions called by sqlite
@@ -2433,16 +2395,19 @@ int generate_changes_list(int argc, char **argv, struct tm *t)
     return SQLITE_OK;
 }
 
-int generate_heatmap(int argc, char **argv, struct tm *t)
+int generate_heatmap(int argc, char** argv, struct tm* t)
 {
     (void)argc;
     (void)t;
 
-    sqlite3 *db;
-    char *zErrMsg = NULL;
+    sqlite3* db;
+    char* zErrMsg = NULL;
     int rc;
-    char filename[25] = {0};
-    char player[MAX_NAME_LEN] = {0};
+    char filename[25] = { 0 };
+    char buffer1[255] = { 0 };
+    char buffer2[255] = { 0 };
+    char player[MAX_NAME_LEN] = { 0 };
+    FILE* f_template = NULL;
 
     strcat(player, *argv++);
     while (*argv) {
@@ -2452,57 +2417,92 @@ int generate_heatmap(int argc, char **argv, struct tm *t)
 
     snprintf(filename, sizeof filename, "%.10s-heatmap.htm", player);
     for (int i = 0; i < 10; ++i)
+    {
         filename[i] = (char)tolower(filename[i]);
+        if (isspace(filename[i]))
+            filename[i] = '-';
+    }
+
     if (fw = fopen(filename, "w"), fw == NULL) {
         fprintf(stderr, "Error in opening file for writing!\n");
         return -1;
     }
 
-    fprintf(fw, "%s", player_heatmap);
-    fprintf(fw, heatmap, player);
+    if (f_template = fopen("templates\\HeatmapChart-template.htm", "r"), f_template == NULL)
+    {
+        fclose(fw);
+        fprintf(stderr, "Error in opening heatmap template file for reading!\n");
+        return -2;
+    }
+
+
+    while (fgets(buffer1, sizeof buffer1, f_template) != NULL) {
+        if (strstr(buffer1, "COPY_PAUSE"))
+        {
+            buffer2[strcspn(buffer2, "\n")] = '\0';
+            fputs(buffer2, fw);
+            fprintf(fw, "%s", player);
+            break;
+        }
+        else
+        {
+            if (*buffer2) {
+                fputs(buffer2, fw);
+            }
+            strcpy(buffer2, buffer1);
+        }
+    }
+
+    while (fgets(buffer1, sizeof buffer1, f_template) != NULL) {
+        if (strstr(buffer1, "COPY_PAUSE"))
+            break;
+        fputs(buffer1, fw);
+    }
 
     rc = sqlite3_open("highscores.db", &db);
-    if( rc ){
-      fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-      return -2;
+    if (rc) {
+        fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+        return -3;
     }
 
     // Read number of rows.
     snprintf(sql_cmd, sizeof sql_cmd, 
-        "SELECT count(sub.place) FROM (SELECT nick, place FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s'", player);
+        "SELECT count(sub.place) FROM (SELECT nick, place FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s'",
+        player);
     sqlite3_exec(db, sql_cmd, callback_count, &generic_int_placeholder, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         sqlite3_close(db);
-        return -3;
+        return -4;
     }
 
     row_cnt = 0;
     snprintf(sql_cmd, sizeof sql_cmd, 
-        "SELECT sub.level, sub.place FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' ORDER BY sub.level", player);
+        "SELECT sub.level, sub.place FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' ORDER BY sub.level", 
+        player);
     sqlite3_exec(db, sql_cmd, callback_heatmap, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         sqlite3_close(db);
-        return -3;
+        return -5;
     }
 
-    fputs("],\n\t\tdataLabels: {\n\t\t\tenabled: false,\n\t\t\tcolor: '#000000'\n\t\t}\n\t}]\n})\n\t\t</script><hr>\n\n\t"
-            "<div id=\"container2\" style=\"min-width: 310px; max-width: 1600px; height: 600px; margin: 0 auto\"></div>\n\n\t\t"
-            "<script type=\"text/javascript\">\n\n", fw);
-    fputs(histogram_chart, fw);
+    while (fgets(buffer1, sizeof buffer1, f_template) != NULL) {
+        fputs(buffer1, fw);
+    }
+
+    (void)fclose(f_template);
 
     row_cnt = 0;
-    snprintf(sql_cmd, sizeof sql_cmd, 
-        "SELECT sub.place, count(sub.place) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' GROUP BY sub.place;", player);
+    snprintf(sql_cmd, sizeof sql_cmd, "SELECT sub.place, count(sub.place) FROM (SELECT * FROM scores ORDER BY day DESC LIMIT 6000 ) sub WHERE sub.nick='%s' GROUP BY sub.place;", player);
     sqlite3_exec(db, sql_cmd, callback_histogram, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL Error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         sqlite3_close(db);
-        return -4;
+        return -6;
     }
 
     sqlite3_close(db);
